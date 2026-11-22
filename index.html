@@ -625,7 +625,7 @@ footer{border-top:1px solid var(--line);padding-block:44px 56px;margin-top:0}
       <ul class="rule-list" style="max-width:40em">
         <li><span>Studio</span><span>St. Petersburg, Florida</span></li>
         <li><span>Standard awards</span><span>Delivered 7 to 10 business days after you approve the proof</span></li>
-        <li><span>Shipping</span><span>Included in the price</span></li>
+        <li><span>Shipping</span><span>Included within the US</span></li>
         <li><span>Orders of 5 or more</span><span>10% off</span></li>
         <li><span>Bespoke</span><span><a href="#bespoke">Start an enquiry</a></span></li>
       </ul>
@@ -832,7 +832,7 @@ function summaryRows(){
   rows.push(['Logo',state.logo?state.logo.name:'To follow by email']);
   rows.push(['Quantity',String(state.qty)]);
   if(bulk())rows.push(['Discount','10% off for '+BULK_MIN+' or more']);
-  rows.push(['Shipping','Included']);
+  rows.push(['Shipping','Included within the US']);
   rows.push(['Estimated total',money(total())]);
   return rows;
 }
@@ -851,7 +851,7 @@ function renderCz(){
   $('qOut').textContent=state.qty;
   $('unitPrice').textContent='From '+money(a.price)+' each';
   $('totalAmt').textContent=money(total());
-  $('totalHint').textContent=(bulk()?'Shipping included. 10% off applied. ':'Shipping included. 10% off orders of '+BULK_MIN+' or more. ')+'Confirmed with your proof.';
+  $('totalHint').textContent=(bulk()?'US shipping included. 10% off applied. ':'US shipping included. 10% off orders of '+BULK_MIN+' or more. ')+'Confirmed with your proof.';
   var over=state.qty>CARD_LIMIT;
   $('payBtn').disabled=over; $('payBtn').hidden=over;
   $('quoteBtn').className=over?'btn':'btn ghost';
