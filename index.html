@@ -461,7 +461,7 @@ footer{border-top:1px solid var(--line);padding-block:44px 56px;margin-top:0}
 
     <!-- confirmation -->
     <div id="czDone" hidden style="padding-bottom:clamp(60px,8vw,110px)">
-      <div class="notice" style="margin-bottom:32px"><strong>Preview only</strong><span>Nothing was sent and no payment was taken. On the live site this step saves the order and starts the proof.</span></div>
+      <div class="notice" style="margin-bottom:32px" role="status"><strong>Sent</strong><span id="doneNote"></span></div>
       <div class="split">
         <div class="stack g24">
           <div class="stack g12"><p class="label">Received</p><h2 id="doneTitle"></h2><p class="muted" id="doneLede"></p></div>
@@ -591,7 +591,7 @@ footer{border-top:1px solid var(--line);padding-block:44px 56px;margin-top:0}
         <li><span>Budget</span><span>A range is enough. It tells us which materials and sizes to propose.</span></li>
       </ul>
       <form class="form" id="bespokeForm" novalidate>
-        <div class="notice" id="bespokeDone" hidden><strong>Preview only</strong><span>Nothing was sent. On the live site this enquiry is saved and emailed to the studio.</span></div>
+        <div class="notice" id="bespokeDone" role="status" hidden><strong>Sent</strong><span>Your enquiry has reached the studio. We will reply by email.</span></div>
         <div class="two">
           <div class="field"><label for="bName">Your name</label><input id="bName" type="text" autocomplete="name" required></div>
           <div class="field"><label for="bCompany">Company</label><input id="bCompany" type="text" autocomplete="organization"></div>
@@ -606,7 +606,7 @@ footer{border-top:1px solid var(--line);padding-block:44px 56px;margin-top:0}
         </div>
         <div class="field"><label for="bMsg">The occasion and what you have in mind</label><textarea id="bMsg" rows="5" required></textarea></div>
         <p class="status bad" id="bespokeError" role="alert" hidden></p>
-        <div class="row"><button class="btn" type="submit">Send enquiry</button></div>
+        <div class="row"><button class="btn" type="submit" id="bespokeSubmit">Send enquiry</button></div>
       </form>
     </div>
   </div>
@@ -851,6 +851,14 @@ function renderCz(){
   $('pathHint').textContent=over?'Orders of more than '+CARD_LIMIT+' awards are quoted. We send a proof and a price together.':'Either way, we send a proof for approval before anything is engraved.';
   saveDraft();
 }
+/* ---------- sending (Formspree) ---------- */
+var FORMS={details:'mkjrqgan',bespoke:'mvkawgng'};
+function sendForm(id,data){
+  return fetch('https://formspree.io/f/'+id,{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/json'},body:JSON.stringify(data)})
+    .then(function(r){return r.json().catch(function(){return {};}).then(function(j){if(r.ok&&j.ok!==false)return j;throw new Error('not accepted');});});
+}
+function sendFailed(){return 'This was not sent. Check your connection and try again, or email '+$('emailAddr').textContent+'.';}
+function busy(btn,on,label){btn.disabled=on;btn.textContent=on?'Sending\u2026':label;}
 function showStep(step){
   state.step=step;
   $('czDesign').hidden=step!=='design'; $('czDetails').hidden=step!=='details'; $('czDone').hidden=step!=='done';
@@ -858,13 +866,14 @@ function showStep(step){
     var card=state.path==='card';
     $('detEyebrow').textContent=card?'Pay by card':'Proof and quote';
     $('detTitle').textContent=card?'Where should we send your proof?':'Where should we send your proof and quote?';
-    $('detLede').textContent=card?'You pay on the next step. We email your proof before engraving, and refund in full if we cannot use your artwork.':'We check your artwork and reply by email with a proof and a confirmed price.';
-    $('detSubmit').textContent=card?'Continue to payment':'Send for proof';
+    $('detLede').textContent=card?'No payment is taken today. We email your proof first, then a secure card payment link once you approve it.':'We check your artwork and reply by email with a proof and a confirmed price.';
+    $('detSubmit').textContent=card?'Send order for proof':'Send for proof';
     $('detSummary').innerHTML=summaryHTML(); draw($('czStage2'),state.award,cfg());
   }
   if(step==='done'){
     var nm=($('dName').value||'').trim().split(' ')[0];
-    $('doneTitle').textContent=(nm?'Thank you, '+nm+'. ':'Thank you. ')+(state.path==='card'?'Your order is in.':'Your proof request is in.');
+    $('doneTitle').textContent=(nm?'Thank you, '+nm+'. ':'Thank you. ')+(state.path==='card'?'Your order request is in.':'Your proof request is in.');
+    $('doneNote').textContent='Your details have reached the studio. '+(state.path==='card'?'No payment was taken. We email a card payment link once you approve your proof.':'No payment was taken.')+(state.logo?' Your logo file was not sent with this form. We will ask for it by email.':'');
     $('doneLede').textContent='We check your artwork and email a proof to '+($('dEmail').value||'you')+'. Your awards are delivered 7 to 10 business days after you approve it.';
     $('doneSummary').innerHTML=summaryHTML(); draw($('czStage3'),state.award,cfg());
   }
@@ -976,7 +985,12 @@ function init(){
     var err=$('detError'),name=$('dName').value.trim(),email=$('dEmail').value.trim();
     if(!name){err.hidden=false;err.textContent='Enter your name so we know who to send the proof to.';$('dName').focus();return;}
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){err.hidden=false;err.textContent='Enter a work email address, for example name@company.com.';$('dEmail').focus();return;}
-    err.hidden=true; showStep('done');
+    err.hidden=true;
+    var btn=$('detSubmit'),label=btn.textContent,data={_subject:(state.path==='card'?'Order for proof: ':'Proof and quote request: ')+AWARDS[state.award].name,name:name,email:email,Phone:$('dPhone').value.trim()||'Not given','Date needed':$('dDate').value||'Not given',Notes:$('dNotes').value.trim()||'None',Route:state.path==='card'?'Pay by card after proof':'Proof and quote'};
+    summaryRows().forEach(function(r){data[r[0]]=r[1];});
+    if(state.logo)data.Logo=state.logo.name+' (file not attached, ask the customer for it)';
+    busy(btn,true,label);
+    sendForm(FORMS.details,data).then(function(){busy(btn,false,label);showStep('done');},function(){busy(btn,false,label);err.hidden=false;err.textContent=sendFailed();});
   });
   $('bespokeForm').addEventListener('submit',function(e){
     e.preventDefault();
@@ -984,7 +998,10 @@ function init(){
     if(!$('bName').value.trim()){err.hidden=false;err.textContent='Enter your name.';$('bName').focus();return;}
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test($('bEmail').value.trim())){err.hidden=false;err.textContent='Enter a work email address, for example name@company.com.';$('bEmail').focus();return;}
     if(!$('bMsg').value.trim()){err.hidden=false;err.textContent='Tell us a little about the occasion.';$('bMsg').focus();return;}
-    err.hidden=true; ok.hidden=false; ok.scrollIntoView({block:'center'});
+    err.hidden=true;
+    var btn=$('bespokeSubmit'),data={_subject:'Bespoke enquiry: '+($('bCompany').value.trim()||$('bName').value.trim()),name:$('bName').value.trim(),email:$('bEmail').value.trim(),Company:$('bCompany').value.trim()||'Not given','Date needed':$('bDate').value||'Not given','How many pieces':$('bQty').value.trim()||'Not given','Budget per piece':$('bBudget').value||'Not sure yet',Message:$('bMsg').value.trim()};
+    busy(btn,true,'Send enquiry');
+    sendForm(FORMS.bespoke,data).then(function(){busy(btn,false,'Send enquiry');$('bespokeForm').reset();ok.hidden=false;ok.scrollIntoView({block:'center'});},function(){busy(btn,false,'Send enquiry');err.hidden=false;err.textContent=sendFailed();});
   });
   $('copyEmail').addEventListener('click',function(){copy($('emailAddr').textContent,$('emailMsg'),'Address copied.');});
   $('menuBtn').addEventListener('click',function(){var o=$('nav').classList.toggle('open');$('menuBtn').setAttribute('aria-expanded',String(o));});
