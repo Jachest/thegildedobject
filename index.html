@@ -429,7 +429,7 @@ footer{border-top:1px solid var(--line);padding-block:44px 56px;margin-top:0}
           </div>
         </fieldset>
 
-        <div class="total"><div class="stack"><span class="label">Estimated total</span><span class="hint">Confirmed with your proof.</span></div><span class="amt" id="totalAmt"></span></div>
+        <div class="total"><div class="stack"><span class="label">Estimated total</span><span class="hint" id="totalHint"></span></div><span class="amt" id="totalAmt"></span></div>
         <div class="actions">
           <button class="btn" type="button" id="payBtn">Pay by card</button>
           <button class="btn ghost" type="button" id="quoteBtn">Request a proof and quote</button>
@@ -625,6 +625,8 @@ footer{border-top:1px solid var(--line);padding-block:44px 56px;margin-top:0}
       <ul class="rule-list" style="max-width:40em">
         <li><span>Studio</span><span>St. Petersburg, Florida</span></li>
         <li><span>Standard awards</span><span>Delivered 7 to 10 business days after you approve the proof</span></li>
+        <li><span>Shipping</span><span>Included in the price</span></li>
+        <li><span>Orders of 5 or more</span><span>10% off</span></li>
         <li><span>Bespoke</span><span><a href="#bespoke">Start an enquiry</a></span></li>
       </ul>
     </div>
@@ -653,7 +655,7 @@ var AWARDS = {
   meridian:{name:'The Meridian',price:250,short:'A tall art-acrylic tower with a black engraving panel. Limited edition.',long:'A ten-inch tower with a blue and gold art finish, a black panel engraved with your wording, and a leather back. A limited edition.',spec:'Art acrylic tower, black panel and base, leather back'}
 };
 var ORDER = ['cameo','medallion','diamond','keystone','meridian'];
-var CARD_LIMIT = 10, MAX_QTY = 50;
+var CARD_LIMIT = 10, MAX_QTY = 50, BULK_MIN = 5, BULK_OFF = 0.10;
 var EXAMPLE = {business:'Your Company',title:"President's Award 2026",recipient:'Alexandra Reyes'};
 
 var state = {award:'cameo',business:EXAMPLE.business,title:EXAMPLE.title,recipient:EXAMPLE.recipient,names:'',qty:1,logo:null,touched:false,path:'quote',step:'design'};
@@ -661,7 +663,9 @@ var state = {award:'cameo',business:EXAMPLE.business,title:EXAMPLE.title,recipie
 /* ---------- helpers ---------- */
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-function money(n){return '$'+n.toLocaleString('en-US');}
+function money(n){return '$'+n.toLocaleString('en-US',n%1?{minimumFractionDigits:2,maximumFractionDigits:2}:{});}
+function bulk(){return state.qty>=BULK_MIN;}
+function total(){return Math.round(AWARDS[state.award].price*state.qty*(bulk()?1-BULK_OFF:1)*100)/100;}
 var uidN = 0;
 
 /* ---------- award drawings ---------- */
@@ -827,7 +831,9 @@ function summaryRows(){
   else rows.push(['Recipient',state.recipient||'Not entered']);
   rows.push(['Logo',state.logo?state.logo.name:'To follow by email']);
   rows.push(['Quantity',String(state.qty)]);
-  rows.push(['Estimated total',money(a.price*state.qty)]);
+  if(bulk())rows.push(['Discount','10% off for '+BULK_MIN+' or more']);
+  rows.push(['Shipping','Included']);
+  rows.push(['Estimated total',money(total())]);
   return rows;
 }
 function summaryHTML(){return summaryRows().map(function(r){return '<li><span>'+r[0]+'</span><span>'+esc(r[1])+'</span></li>';}).join('');}
@@ -844,7 +850,8 @@ function renderCz(){
   $('exampleNote').hidden=state.touched;
   $('qOut').textContent=state.qty;
   $('unitPrice').textContent='From '+money(a.price)+' each';
-  $('totalAmt').textContent=money(a.price*state.qty);
+  $('totalAmt').textContent=money(total());
+  $('totalHint').textContent=(bulk()?'Shipping included. 10% off applied. ':'Shipping included. 10% off orders of '+BULK_MIN+' or more. ')+'Confirmed with your proof.';
   var over=state.qty>CARD_LIMIT;
   $('payBtn').disabled=over; $('payBtn').hidden=over;
   $('quoteBtn').className=over?'btn':'btn ghost';
