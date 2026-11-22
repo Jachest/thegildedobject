@@ -864,7 +864,7 @@ function renderCz(){
 var FORMS={details:'mkjrqgan',bespoke:'mvkawgng'};
 function sendForm(id,data,file){
   var opt={method:'POST',headers:{'Accept':'application/json','Content-Type':'application/json'},body:JSON.stringify(data)};
-  if(file){var fd=new FormData();Object.keys(data).forEach(function(k){fd.append(k,data[k]);});fd.append('logo',file,file.name);opt={method:'POST',headers:{'Accept':'application/json'},body:fd};}
+  if(file){var fd=new FormData();Object.keys(data).forEach(function(k){fd.append(k,data[k]);});fd.append('Attached file',file,file.name);opt={method:'POST',headers:{'Accept':'application/json'},body:fd};}
   return fetch('https://formspree.io/f/'+id,opt)
     .then(function(r){return r.json().catch(function(){return {};}).then(function(j){if(r.ok&&j.ok!==false)return j;throw new Error('not accepted');});});
 }
