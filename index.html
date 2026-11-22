@@ -202,6 +202,7 @@ figure{margin:0}
 .field .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
 .field label,.field .lab{font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
 .count{font-size:.74rem;color:var(--faint);font-variant-numeric:tabular-nums}
+input[type=file]{color:inherit;font:inherit;font-size:.9rem;max-width:100%}
 input[type=text],input[type=email],input[type=tel],input[type=date],textarea,select{width:100%;background:rgba(244,239,230,.03);border:1px solid var(--line-soft);color:var(--ivory);font-family:var(--ui);font-weight:300;font-size:1rem;padding:12px 14px;border-radius:0}
 textarea{resize:vertical;min-height:96px;line-height:1.5}
 input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
@@ -406,9 +407,9 @@ footer{border-top:1px solid var(--line);padding-block:44px 56px;margin-top:0}
           <legend>Logo</legend>
           <label class="drop" id="drop" for="logoFile">
             <span class="thumb" id="logoThumb">Logo</span>
-            <span class="txt"><strong id="dropTitle">Upload your logo</strong><span class="hint">PNG, JPG or SVG, up to 10 MB. Drag a file here or choose one.</span></span>
+            <span class="txt"><strong id="dropTitle">Upload your logo</strong><span class="hint">PNG, JPG or SVG, up to 10 MB. Drag a file here or choose one. It is sent with your order.</span></span>
           </label>
-          <input class="sr" id="logoFile" type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp">
+          <input class="sr" id="logoFile" type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,.pdf,.ai,.eps">
           <p class="status" id="logoStatus" hidden></p>
         </fieldset>
 
@@ -605,6 +606,7 @@ footer{border-top:1px solid var(--line);padding-block:44px 56px;margin-top:0}
           <div class="field"><label for="bBudget">Budget per piece</label><select id="bBudget"><option value="">Not sure yet</option><option>Under $250</option><option>$250 to $500</option><option>$500 to $1,000</option><option>Over $1,000</option></select></div>
         </div>
         <div class="field"><label for="bMsg">The occasion and what you have in mind</label><textarea id="bMsg" rows="5" required></textarea></div>
+        <div class="field"><label for="bFile">Logo or artwork (optional)</label><input id="bFile" type="file"><span class="hint">Any format, up to 10 MB.</span></div>
         <p class="status bad" id="bespokeError" role="alert" hidden></p>
         <div class="row"><button class="btn" type="submit" id="bespokeSubmit">Send enquiry</button></div>
       </form>
@@ -829,7 +831,7 @@ function summaryRows(){
   var a=AWARDS[state.award],rows=[['Piece',a.name],['Company',state.business||'Not entered'],['Award',state.title||'Not entered']];
   if(state.qty>1){var n=nameList();rows.push(['Recipients',n.length?n.join(', '):'Not entered']);}
   else rows.push(['Recipient',state.recipient||'Not entered']);
-  rows.push(['Logo',state.logo?state.logo.name:'To follow by email']);
+  rows.push(['Logo',state.logo?state.logo.name:'None added']);
   rows.push(['Quantity',String(state.qty)]);
   if(bulk())rows.push(['Discount','10% off for '+BULK_MIN+' or more']);
   rows.push(['Shipping','Included within the US']);
@@ -860,8 +862,10 @@ function renderCz(){
 }
 /* ---------- sending (Formspree) ---------- */
 var FORMS={details:'mkjrqgan',bespoke:'mvkawgng'};
-function sendForm(id,data){
-  return fetch('https://formspree.io/f/'+id,{method:'POST',headers:{'Accept':'application/json','Content-Type':'application/json'},body:JSON.stringify(data)})
+function sendForm(id,data,file){
+  var opt={method:'POST',headers:{'Accept':'application/json','Content-Type':'application/json'},body:JSON.stringify(data)};
+  if(file){var fd=new FormData();Object.keys(data).forEach(function(k){fd.append(k,data[k]);});fd.append('logo',file,file.name);opt={method:'POST',headers:{'Accept':'application/json'},body:fd};}
+  return fetch('https://formspree.io/f/'+id,opt)
     .then(function(r){return r.json().catch(function(){return {};}).then(function(j){if(r.ok&&j.ok!==false)return j;throw new Error('not accepted');});});
 }
 function sendFailed(){return 'This was not sent. Check your connection and try again, or email '+$('emailAddr').textContent+'.';}
@@ -880,7 +884,7 @@ function showStep(step){
   if(step==='done'){
     var nm=($('dName').value||'').trim().split(' ')[0];
     $('doneTitle').textContent=(nm?'Thank you, '+nm+'. ':'Thank you. ')+(state.path==='card'?'Your order request is in.':'Your proof request is in.');
-    $('doneNote').textContent='Your details have reached the studio. '+(state.path==='card'?'No payment was taken. We email a card payment link once you approve your proof.':'No payment was taken.')+(state.logo?' Your logo file was not sent with this form. We will ask for it by email.':'');
+    $('doneNote').textContent='Your details have reached the studio. '+(state.path==='card'?'No payment was taken. We email a card payment link once you approve your proof.':'No payment was taken.')+(state.logo?' Your logo was sent with them.':'');
     $('doneLede').textContent='We check your artwork and email a proof to '+($('dEmail').value||'you')+'. Your awards are delivered 7 to 10 business days after you approve it.';
     $('doneSummary').innerHTML=summaryHTML(); draw($('czStage3'),state.award,cfg());
   }
@@ -914,13 +918,19 @@ function engraveMask(dataUrl,cb){
 function handleFile(f){
   if(!f) return;
   var okType=/^image\/(png|jpeg|svg\+xml|webp)$/.test(f.type);
-  if(!okType){setStatus('bad','That file type cannot be previewed. Use a PNG, JPG or SVG. If you only have an AI, EPS or PDF, send it with your proof request.');return;}
+  if(!okType&&!/\.(ai|eps|pdf)$/i.test(f.name)){setStatus('bad','That file type cannot be used. Upload a PNG, JPG, SVG, AI, EPS or PDF.');return;}
   if(f.size>10*1024*1024){setStatus('bad','That file is over 10 MB. Export a smaller PNG or an SVG and try again.');return;}
+  if(!okType){
+    state.logo={url:null,name:f.name,file:f};
+    $('logoThumb').textContent='Logo'; $('dropTitle').textContent=f.name;
+    setStatus('ok','This file cannot be previewed, but it is sent with your order. We check every logo before the proof. <button class="linkbtn" type="button" id="logoRemove">Remove</button>');
+    $('logoRemove').addEventListener('click',clearLogo); refresh(); return;
+  }
   var r=new FileReader();
   r.onload=function(){
     engraveMask(r.result,function(m){
       if(!m){setStatus('bad','We could not read that image. Try exporting it again as a PNG.');return;}
-      state.logo={url:m.url,name:f.name};
+      state.logo={url:m.url,name:f.name,file:f};
       $('logoThumb').innerHTML='<img alt="" src="'+m.url+'">'; $('dropTitle').textContent=f.name;
       var rm=' <button class="linkbtn" type="button" id="logoRemove">Remove</button>';
       if(f.type==='image/svg+xml') setStatus('ok','Vector file. This is the best format for engraving.'+rm);
@@ -995,9 +1005,8 @@ function init(){
     err.hidden=true;
     var btn=$('detSubmit'),label=btn.textContent,data={_subject:(state.path==='card'?'Order for proof: ':'Proof and quote request: ')+AWARDS[state.award].name,name:name,email:email,Phone:$('dPhone').value.trim()||'Not given','Date needed':$('dDate').value||'Not given',Notes:$('dNotes').value.trim()||'None',Route:state.path==='card'?'Pay by card after proof':'Proof and quote'};
     summaryRows().forEach(function(r){data[r[0]]=r[1];});
-    if(state.logo)data.Logo=state.logo.name+' (file not attached, ask the customer for it)';
     busy(btn,true,label);
-    sendForm(FORMS.details,data).then(function(){busy(btn,false,label);showStep('done');},function(){busy(btn,false,label);err.hidden=false;err.textContent=sendFailed();});
+    sendForm(FORMS.details,data,state.logo&&state.logo.file).then(function(){busy(btn,false,label);showStep('done');},function(){busy(btn,false,label);err.hidden=false;err.textContent=sendFailed();});
   });
   $('bespokeForm').addEventListener('submit',function(e){
     e.preventDefault();
@@ -1005,10 +1014,11 @@ function init(){
     if(!$('bName').value.trim()){err.hidden=false;err.textContent='Enter your name.';$('bName').focus();return;}
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test($('bEmail').value.trim())){err.hidden=false;err.textContent='Enter a work email address, for example name@company.com.';$('bEmail').focus();return;}
     if(!$('bMsg').value.trim()){err.hidden=false;err.textContent='Tell us a little about the occasion.';$('bMsg').focus();return;}
+    var bf=$('bFile').files[0]; if(bf&&bf.size>10*1024*1024){err.hidden=false;err.textContent='That file is over 10 MB. Choose a smaller file.';return;}
     err.hidden=true;
-    var btn=$('bespokeSubmit'),data={_subject:'Bespoke enquiry: '+($('bCompany').value.trim()||$('bName').value.trim()),name:$('bName').value.trim(),email:$('bEmail').value.trim(),Company:$('bCompany').value.trim()||'Not given','Date needed':$('bDate').value||'Not given','How many pieces':$('bQty').value.trim()||'Not given','Budget per piece':$('bBudget').value||'Not sure yet',Message:$('bMsg').value.trim()};
+    var btn=$('bespokeSubmit'),data={_subject:'Bespoke enquiry: '+($('bCompany').value.trim()||$('bName').value.trim()),name:$('bName').value.trim(),email:$('bEmail').value.trim(),Company:$('bCompany').value.trim()||'Not given','Date needed':$('bDate').value||'Not given','How many pieces':$('bQty').value.trim()||'Not given','Budget per piece':$('bBudget').value||'Not sure yet',Message:$('bMsg').value.trim(),Artwork:bf?bf.name:'None added'};
     busy(btn,true,'Send enquiry');
-    sendForm(FORMS.bespoke,data).then(function(){busy(btn,false,'Send enquiry');$('bespokeForm').reset();ok.hidden=false;ok.scrollIntoView({block:'center'});},function(){busy(btn,false,'Send enquiry');err.hidden=false;err.textContent=sendFailed();});
+    sendForm(FORMS.bespoke,data,bf).then(function(){busy(btn,false,'Send enquiry');$('bespokeForm').reset();ok.hidden=false;ok.scrollIntoView({block:'center'});},function(){busy(btn,false,'Send enquiry');err.hidden=false;err.textContent=sendFailed();});
   });
   $('copyEmail').addEventListener('click',function(){copy($('emailAddr').textContent,$('emailMsg'),'Address copied.');});
   $('menuBtn').addEventListener('click',function(){var o=$('nav').classList.toggle('open');$('menuBtn').setAttribute('aria-expanded',String(o));});
